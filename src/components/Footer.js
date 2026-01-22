@@ -141,7 +141,7 @@ const Footer = () => {
               </SocialIcon>
               
               <SocialIcon 
-                href="https://github.com/deHouse" 
+                href="https://github.com/Lightdrip/DeHouse" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 aria-label="View our GitHub repositories"
