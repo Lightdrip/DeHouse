@@ -16,6 +16,10 @@ import { DonationProvider } from './utils/DonationContext';
 // Video background component
 const VideoBackground = () => {
   useEffect(() => {
+    const existingElement = document.getElementById('video-background');
+    if (existingElement) {
+      return;
+    }
     // Create video element
     const videoElement = document.createElement('video');
     videoElement.id = 'video-background';
@@ -23,6 +27,7 @@ const VideoBackground = () => {
     videoElement.loop = true;
     videoElement.muted = true;
     videoElement.playsInline = true;
+    videoElement.dataset.persist = 'true';
 
     // Set video source
     const source = document.createElement('source');
@@ -35,12 +40,14 @@ const VideoBackground = () => {
 
     // Start playing the video
     videoElement.play().catch(error => {
-      console.error('Error playing the video:', error);
+      if (error?.name !== 'AbortError') {
+        console.error('Error playing the video:', error);
+      }
     });
 
     // Clean up on component unmount
     return () => {
-      if (document.body.contains(videoElement)) {
+      if (document.body.contains(videoElement) && videoElement.dataset.persist !== 'true') {
         document.body.removeChild(videoElement);
       }
     };

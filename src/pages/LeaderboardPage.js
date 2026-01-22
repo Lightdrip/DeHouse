@@ -161,7 +161,7 @@ const Pagination = styled(Flex)`
 `;
 
 const PageButton = styled.button`
-  background-color: ${props => props.active ? 'var(--primary)' : 'var(--card-bg)'};
+  background-color: ${props => props.active === 'true' ? 'var(--primary)' : 'var(--card-bg)'};
   color: var(--text-primary);
   border: none;
   border-radius: 8px;
@@ -174,7 +174,7 @@ const PageButton = styled.button`
   transition: all 0.3s ease;
 
   &:hover {
-    background-color: ${props => props.active ? 'var(--primary)' : 'var(--primary-dark)'};
+    background-color: ${props => props.active === 'true' ? 'var(--primary)' : 'var(--primary-dark)'};
   }
 `;
 
@@ -549,19 +549,19 @@ const LeaderboardPage = () => {
 
                 <FilterContainer gap="16px">
                   <Button
-                    secondary={timeFilter !== 'all'}
+                    secondary={(timeFilter !== 'all').toString()}
                     onClick={() => handleTimeFilterChange('all')}
                   >
                     All Time
                   </Button>
                   <Button
-                    secondary={timeFilter !== 'month'}
+                    secondary={(timeFilter !== 'month').toString()}
                     onClick={() => handleTimeFilterChange('month')}
                   >
                     This Month
                   </Button>
                   <Button
-                    secondary={timeFilter !== 'week'}
+                    secondary={(timeFilter !== 'week').toString()}
                     onClick={() => handleTimeFilterChange('week')}
                   >
                     This Week
@@ -615,9 +615,9 @@ const LeaderboardPage = () => {
 
               <Pagination justify="center" gap="8px">
                 <PageButton onClick={() => handlePageChange(Math.max(1, currentPage - 1))}>&lt;</PageButton>
-                <PageButton active={currentPage === 1} onClick={() => handlePageChange(1)}>1</PageButton>
-                <PageButton active={currentPage === 2} onClick={() => handlePageChange(2)}>2</PageButton>
-                <PageButton active={currentPage === 3} onClick={() => handlePageChange(3)}>3</PageButton>
+                <PageButton active={(currentPage === 1).toString()} onClick={() => handlePageChange(1)}>1</PageButton>
+                <PageButton active={(currentPage === 2).toString()} onClick={() => handlePageChange(2)}>2</PageButton>
+                <PageButton active={(currentPage === 3).toString()} onClick={() => handlePageChange(3)}>3</PageButton>
                 <PageButton>...</PageButton>
                 <PageButton onClick={() => handlePageChange(10)}>10</PageButton>
                 <PageButton onClick={() => handlePageChange(Math.min(10, currentPage + 1))}>&gt;</PageButton>

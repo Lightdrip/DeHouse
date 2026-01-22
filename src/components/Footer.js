@@ -2,6 +2,7 @@ import React from 'react';
 import styled, { keyframes } from 'styled-components';
 import { Container, Flex, Text } from '../styles/StyledComponents';
 import { Link } from 'react-router-dom';
+import { FaXTwitter, FaDiscord, FaTelegram, FaGithub } from 'react-icons/fa6';
 
 const FooterContainer = styled.footer`
   background-color: var(--card-bg);
@@ -72,19 +73,28 @@ const SocialLinks = styled(Flex)`
 `;
 
 const SocialIcon = styled.a`
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: rgba(255, 255, 255, 0.05);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-primary);
-  transition: all 0.3s ease;
+  color: var(--text-secondary);
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 
   &:hover {
     background-color: var(--primary);
-    transform: translateY(-3px);
+    color: white;
+    transform: translateY(-5px);
+    border-color: var(--primary);
+    box-shadow: 0 10px 20px rgba(108, 92, 231, 0.2);
+  }
+
+  &:focus {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
   }
 `;
 
@@ -109,14 +119,35 @@ const Footer = () => {
           <FooterSection style={{ flex: '1 1 300px' }}>
             <FooterLogo><LogoPrefix>de</LogoPrefix><LogoGradient>House</LogoGradient></FooterLogo>
             <Text>
-              A community owned RWA DAO treasury that accepts donations and rewards contributors with points for future perks.
+              Revolutionizing real estate through collective ownership, creating a global network of community-owned properties where members can live, connect, and shape the future of RWA co-ownership.
             </Text>
 
-            <SocialLinks gap="12px">
-              <SocialIcon href="#" target="_blank" rel="noopener noreferrer">X</SocialIcon>
-              <SocialIcon href="#" target="_blank" rel="noopener noreferrer">D</SocialIcon>
-              <SocialIcon href="#" target="_blank" rel="noopener noreferrer">T</SocialIcon>
-              <SocialIcon href="#" target="_blank" rel="noopener noreferrer">G</SocialIcon>
+            <SocialLinks gap="20px">
+              <SocialIcon 
+                href="https://twitter.com/DeHouseDAO" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                aria-label="Follow us on X (Twitter)"
+              >
+                <FaXTwitter size={20} />
+              </SocialIcon>
+              <SocialIcon 
+                href="https://discord.gg/zXKQ9YWa9E" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                aria-label="Join our Discord community"
+              >
+                <FaDiscord size={22} />
+              </SocialIcon>
+              
+              <SocialIcon 
+                href="https://github.com/deHouse" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                aria-label="View our GitHub repositories"
+              >
+                <FaGithub size={20} />
+              </SocialIcon>
             </SocialLinks>
           </FooterSection>
 

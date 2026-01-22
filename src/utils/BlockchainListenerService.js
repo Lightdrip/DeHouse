@@ -1,6 +1,7 @@
 import { ethers } from 'ethers';
 import { Connection, PublicKey } from '@solana/web3.js';
 import databaseService from './DatabaseService';
+import treasuryBalanceService from './TreasuryBalanceService'; // Import the service
 
 // --- Constants --- (Keep as before)
 const ETH_TREASURY_ADDRESS = '0x8262ab131e3f52315d700308152e166909ecfa47'.toLowerCase();
@@ -16,6 +17,7 @@ const ERC20_CONTRACTS = {
 };
 const SOL_USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 const COINGECKO_API = 'https://api.coingecko.com/api/v3';
+const IS_DEV = process.env.NODE_ENV === 'development';
 const COINGECKO_DELAY_MS = 1500;
 const BLOCKSTREAM_API = 'https://blockstream.info/api';
 const SOL_POLL_INTERVAL = 20000;
@@ -42,6 +44,9 @@ class BlockchainListenerService {
         try { if(window.ethereum){this.providers.eth=new ethers.BrowserProvider(window.ethereum);console.log('[Init] Using window.ethereum.');}else{console.warn('[Init] No wallet provider. Using Infura.');this.providers.eth=new ethers.JsonRpcProvider('https://mainnet.infura.io/v3/1b261d0ba34946fd9ef865d80a482f7b');} this.providers.sol=new Connection('https://api.mainnet-beta.solana.com','confirmed'); console.log('[Init] Providers OK.');}catch(e){console.error('[Init] Error:',e);throw e;}
     }
     async startListening() { /* ... same ... */
+        if (IS_DEV) {
+            return;
+        }
         try{await this.initProviders();this.startEthereumListener();this.startSolanaListener();this.startBitcoinListener();console.log('[Listener] All started.');}catch(e){console.error('[Listener] Start failed:',e);}
     }
     async processDonation(donationData) {
@@ -70,6 +75,9 @@ class BlockchainListenerService {
 
             if(added) {
                 console.log(`[Process] Added OK ${added.id}`);
+
+                // --- Trigger balance update ---
+                treasuryBalanceService.triggerBalanceUpdate();
 
                 // Step 2: Directly update the leaderboard (this is the key fix)
                 if (donationData.walletAddress && donationData.points && donationData.usdValue) {

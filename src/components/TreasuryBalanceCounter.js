@@ -173,7 +173,7 @@ const SkeletonBase = styled.div`
   height: ${props => props.height || '20px'};
   width: ${props => props.width || '100%'};
   margin-bottom: ${props => props.mb || '8px'};
-  opacity: ${props => props.isLoading ? '1' : '0'};
+  opacity: ${props => props.isloading === 'true' ? '1' : '0'};
   transition: opacity 0.3s ease;
 `;
 
@@ -225,8 +225,8 @@ const LoadingOverlay = styled.div`
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border-radius: 16px;
-  opacity: ${props => props.initialLoad ? '1' : '0'};
-  pointer-events: ${props => props.initialLoad ? 'auto' : 'none'};
+  opacity: ${props => props.initialload === 'true' ? '1' : '0'};
+  pointer-events: ${props => props.initialload === 'true' ? 'auto' : 'none'};
   transition: opacity 0.3s ease;
 `;
 
@@ -249,6 +249,8 @@ const TreasuryBalanceCounter = () => {
     balances: { btc: 0, eth: 0, sol: 0 },
     prices: { btc: 0, eth: 0, sol: 0 },
     usdValues: { btc: 0, eth: 0, sol: 0 },
+    splTokens: [],
+    splTokensUsdValue: 0,
     totalUSD: 0,
     lastUpdated: null
   });
@@ -321,11 +323,53 @@ const TreasuryBalanceCounter = () => {
       throw new Error('Invalid data returned from service');
     }
 
+    // Parse all numeric values
+    const btcValue = parseFloat(data.usdValues?.btc || 0);
+    const ethValue = parseFloat(data.usdValues?.eth || 0);
+    const solValue = parseFloat(data.usdValues?.sol || 0);
+    const splTokensValue = parseFloat(data.splTokensUsdValue || 0);
+    const totalFromService = parseFloat(data.totalUSD || 0);
+
+    // Check if we have a NET_WORTH token (from Solana.fm)
+    const hasNetWorthData = data.splTokens && data.splTokens.some(token => token.symbol === 'NET_WORTH');
+    
+    let finalSolValue;
+    if (hasNetWorthData) {
+      // If we have net worth data from Solana.fm, use it as the total Solana value
+      const netWorthToken = data.splTokens.find(token => token.symbol === 'NET_WORTH');
+      
+      // Only use NET_WORTH if it's greater than 0
+      if (netWorthToken && netWorthToken.usdValue > 0) {
+        finalSolValue = netWorthToken.usdValue;
+        console.log('Using Solana.fm net worth for SOL value:', finalSolValue);
+      } else {
+        // Fallback to calculated value if NET_WORTH is 0 or invalid
+        finalSolValue = solValue + splTokensValue;
+        console.log('Net Worth is 0 or invalid, using combined SOL + SPL tokens value:', finalSolValue);
+      }
+    } else {
+      // Otherwise, combine native SOL + SPL tokens as before
+      finalSolValue = solValue + splTokensValue;
+      console.log('Using combined SOL + SPL tokens value:', finalSolValue);
+    }
+
+    // Calculate our own total to verify - ensure we include SPL tokens value
+    const calculatedTotal = btcValue + ethValue + finalSolValue;
+
     // Log raw data for debugging
-    console.log('%c[DEBUG-UI] Raw balances from service:', 'background: #4b0082; color: #fff', {
+    console.log('%c[DEBUG-UI] Raw data from service:', 'background: #4b0082; color: #fff', {
       btc: data.balances?.btc,
       eth: data.balances?.eth,
-      sol: data.balances?.sol
+      sol: data.balances?.sol,
+      btcValue,
+      ethValue,
+      solValue,
+      splTokensValue,
+      finalSolValue,
+      totalFromService,
+      calculatedTotal,
+      splTokensCount: data.splTokens?.length || 0,
+      hasNetWorthData
     });
 
     // Ensure all required properties exist
@@ -341,11 +385,15 @@ const TreasuryBalanceCounter = () => {
         sol: parseFloat(data.prices?.sol || 0)
       },
       usdValues: {
-        btc: parseFloat(data.usdValues?.btc || 0),
-        eth: parseFloat(data.usdValues?.eth || 0),
-        sol: parseFloat(data.usdValues?.sol || 0)
+        btc: btcValue,
+        eth: ethValue,
+        sol: finalSolValue  // This includes SPL tokens value or NET_WORTH from Solana.fm
       },
-      totalUSD: parseFloat(data.totalUSD || 0),
+      // Include SPL tokens data
+      splTokens: Array.isArray(data.splTokens) ? data.splTokens : [],
+      splTokensUsdValue: splTokensValue,
+      // Use the calculated total to ensure it includes SPL tokens
+      totalUSD: calculatedTotal,
       lastUpdated: data.lastUpdated || new Date()
     };
 
@@ -391,15 +439,39 @@ const TreasuryBalanceCounter = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Initial fetch and interval setup
+  // Initial fetch and subscription setup
   useEffect(() => {
-    fetchBalances();
+    // Subscribe to balance updates from the service
+    const handleBalanceUpdate = (newData) => {
+      console.log('%c[TreasuryBalanceCounter] Received update from service:', 'color: #6c5ce7', newData);
+      if (newData) {
+        setBalanceData(validateData(newData));
+        
+        // Update loading states based on the data received
+        if (newData.lastUpdated) {
+          setInitialLoad(false);
+          setIsLoading(false);
+        }
+      }
+    };
 
-    // Set up interval to refresh balances every 5 minutes
-    const intervalId = setInterval(() => fetchBalances(true), 5 * 60 * 1000);
+    // Subscribe to the service - this will also trigger an immediate callback with current data
+    treasuryBalanceService.subscribe(handleBalanceUpdate);
 
-    // Clean up interval on component unmount
-    return () => clearInterval(intervalId);
+    // Only perform an initial fetch if we don't have valid data yet
+    const currentData = treasuryBalanceService.getBalances();
+    if (!currentData.lastUpdated || isDataStale()) {
+      fetchBalances();
+    } else {
+      setBalanceData(validateData(currentData));
+      setInitialLoad(false);
+      setIsLoading(false);
+    }
+
+    // Clean up subscription on component unmount
+    return () => {
+      treasuryBalanceService.unsubscribe(handleBalanceUpdate);
+    };
   }, []);
 
   const formatCurrency = (value) => {
@@ -412,7 +484,9 @@ const TreasuryBalanceCounter = () => {
   };
 
   const formatCrypto = (value, symbol) => {
-    const precision = symbol === 'BTC' ? 8 : 6;
+    let precision = 6;
+    if (symbol === 'BTC') precision = 8;
+    if (symbol === 'SOL') precision = 9;
     return `${parseFloat(value).toFixed(precision)} ${symbol}`;
   };
 
@@ -421,6 +495,26 @@ const TreasuryBalanceCounter = () => {
     { id: 'eth', name: 'Ethereum', symbol: 'ETH', icon: ethIcon },
     { id: 'sol', name: 'Solana', symbol: 'SOL', icon: solIcon }
   ];
+
+  const isDataStale = () => {
+    if (!balanceData.lastUpdated) return false;
+    const now = new Date();
+    const lastUpdate = new Date(balanceData.lastUpdated);
+    const ageInMinutes = (now - lastUpdate) / (1000 * 60);
+    return ageInMinutes > 15; // Consider stale after 15 minutes
+  };
+
+  const handleForceRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      // Use the service's method to trigger an update
+      await treasuryBalanceService.fetchAllBalances(true);
+    } catch (error) {
+      console.error('Error during force refresh:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   return (
     <CounterCard>
@@ -436,24 +530,46 @@ const TreasuryBalanceCounter = () => {
       )}
 
       {/* Only show full overlay on initial load */}
-      <LoadingOverlay initialLoad={initialLoad}>
+      <LoadingOverlay initialload={initialLoad.toString()}>
         <LoadingSpinner />
       </LoadingOverlay>
 
       <CounterContent>
-        <Heading level={3} style={{
-          color: 'white',
-          WebkitBackgroundClip: 'unset',
-          WebkitTextFillColor: 'white',
-          backgroundImage: 'none',
-          textShadow: '0 2px 10px rgba(0, 0, 0, 0.2)'
-        }}>
-          Total Funds Raised
-        </Heading>
+        <Flex justify="space-between" align="center">
+          <Heading level={3} style={{
+            color: 'white',
+            WebkitBackgroundClip: 'unset',
+            WebkitTextFillColor: 'white',
+            backgroundImage: 'none',
+            textShadow: '0 2px 10px rgba(0, 0, 0, 0.2)',
+            margin: 0
+          }}>
+            Total Funds Raised
+          </Heading>
+          <Flex align="center" gap="10px">
+            <button 
+              onClick={handleForceRefresh}
+              disabled={isRefreshing}
+              style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                color: 'white',
+                borderRadius: '4px',
+                padding: '4px 8px',
+                fontSize: '10px',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              {isRefreshing ? 'Refreshing...' : 'Force Refresh'}
+            </button>
+            {isRefreshing && <LoadingSpinner style={{ width: '16px', height: '16px', borderWidth: '2px' }} />}
+          </Flex>
+        </Flex>
 
         {/* Skeleton or actual amount */}
         {isLoading && !balanceData.lastUpdated ? (
-          <SkeletonAmount isLoading={true} />
+          <SkeletonAmount isloading="true" />
         ) : (
           <TotalAmount>
             {formatCurrency(balanceData.totalUSD)}
@@ -462,13 +578,50 @@ const TreasuryBalanceCounter = () => {
 
         {/* Last updated text or skeleton */}
         {isLoading && !balanceData.lastUpdated ? (
-          <SkeletonText isLoading={true} width="60%" />
+          <SkeletonText isloading="true" width="60%" />
         ) : (
-          <Text size="14px" mb="8px">
-            {balanceData.lastUpdated
-              ? `Last updated: ${balanceData.lastUpdated.toLocaleString()}`
-              : 'Fetching latest balances...'}
-          </Text>
+          <Flex direction="column">
+            <Flex align="center" gap="8px" mb="4px">
+              <Text size="14px" style={{ 
+                color: isDataStale() ? 'var(--error)' : 'var(--text-secondary)',
+                display: 'flex',
+                alignItems: 'center'
+              }}>
+                {balanceData.lastUpdated
+                  ? `Last updated: ${balanceData.lastUpdated.toLocaleString()}`
+                  : 'Fetching latest balances...'}
+              </Text>
+              
+              {balanceData.isFromCache && (
+                <span style={{ 
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  color: 'rgba(255, 255, 255, 0.4)',
+                  padding: '1px 6px',
+                  borderRadius: '3px',
+                  fontSize: '9px',
+                  fontWeight: 'bold',
+                  textTransform: 'uppercase'
+                }}>
+                  Cached
+                </span>
+              )}
+
+              {isDataStale() && (
+                <span style={{ 
+                  color: 'var(--error)', 
+                  fontSize: '11px', 
+                  fontWeight: 'bold' 
+                }}>
+                  (Stale)
+                </span>
+              )}
+              
+              {(isRefreshing || balanceData.isFetching) && (
+                <LoadingSpinner style={{ width: '12px', height: '12px', borderWidth: '1.5px' }} />
+              )}
+            </Flex>
+          </Flex>
         )}
 
         {error && (
@@ -493,12 +646,12 @@ const TreasuryBalanceCounter = () => {
               {[1, 2, 3].map(index => (
                 <SkeletonCryptoItem key={index}>
                   <Flex align="center">
-                    <SkeletonIcon isLoading={true} />
-                    <SkeletonText isLoading={true} width="80px" />
+                    <SkeletonIcon isloading="true" />
+                    <SkeletonText isloading="true" width="80px" />
                   </Flex>
                   <Flex direction="column" align="flex-end">
-                    <SkeletonText isLoading={true} width="100px" mb="4px" />
-                    <SkeletonText isLoading={true} width="70px" />
+                    <SkeletonText isloading="true" width="100px" mb="4px" />
+                    <SkeletonText isloading="true" width="70px" />
                   </Flex>
                 </SkeletonCryptoItem>
               ))}
@@ -506,6 +659,7 @@ const TreasuryBalanceCounter = () => {
           ) : (
             // Actual data
             <>
+              {/* Main cryptocurrencies */}
               {cryptoData.map(crypto => (
                 <CryptoItem
                   key={crypto.id}
@@ -531,6 +685,80 @@ const TreasuryBalanceCounter = () => {
                   </Flex>
                 </CryptoItem>
               ))}
+
+              {/* SPL Tokens */}
+              {balanceData.splTokens && balanceData.splTokens.length > 0 && (
+                <>
+                  <Text size="14px" mb="12px" mt="16px" style={{
+                    fontWeight: 600,
+                    color: 'white',
+                    textShadow: '0 2px 10px rgba(0, 0, 0, 0.2)'
+                  }}>
+                    Solana SPL Tokens
+                  </Text>
+
+                  {balanceData.splTokens
+                    .filter(token => token.usdValue > 0) // Only show tokens with value
+                    .sort((a, b) => b.usdValue - a.usdValue) // Sort by value (highest first)
+                    .map(token => (
+                      <CryptoItem
+                        key={token.mint}
+                        justify="space-between"
+                        align="center"
+                      >
+                        <Flex align="center">
+                          {token.logoURI ? (
+                            <CryptoIcon src={token.logoURI} alt={token.symbol} />
+                          ) : (
+                            <div style={{
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '50%',
+                              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                              marginRight: '12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '10px'
+                            }}>
+                              {token.symbol.substring(0, 2)}
+                            </div>
+                          )}
+                          <CryptoName>{token.name || token.symbol}</CryptoName>
+                        </Flex>
+
+                        <Flex direction="column" align="flex-end">
+                          <CryptoBalance>
+                            {(token.balance / Math.pow(10, token.decimals)).toFixed(token.decimals > 6 ? 6 : token.decimals)} {token.symbol}
+                          </CryptoBalance>
+                          <CryptoValue>
+                            {formatCurrency(token.usdValue)}
+                          </CryptoValue>
+                        </Flex>
+                      </CryptoItem>
+                    ))
+                  }
+
+                  {/* Total SPL Tokens Value */}
+                  {balanceData.splTokensUsdValue > 0 && (
+                    <div style={{
+                      marginTop: '12px',
+                      padding: '8px 12px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      justifyContent: 'space-between'
+                    }}>
+                      <Text size="14px" style={{ fontWeight: 600, color: 'white' }}>
+                        Total SPL Tokens Value
+                      </Text>
+                      <CryptoValue>
+                        {formatCurrency(balanceData.splTokensUsdValue)}
+                      </CryptoValue>
+                    </div>
+                  )}
+                </>
+              )}
             </>
           )}
         </CryptoBreakdown>
@@ -575,7 +803,27 @@ const TreasuryBalanceCounter = () => {
                 balances: balanceData.balances,
                 prices: balanceData.prices,
                 usdValues: balanceData.usdValues,
+                mainCryptoTotal: (
+                  balanceData.usdValues.btc +
+                  balanceData.usdValues.eth +
+                  balanceData.usdValues.sol
+                ).toFixed(2),
+                splTokensCount: balanceData.splTokens?.length || 0,
+                splTokensWithValue: balanceData.splTokens?.filter(t => t.usdValue > 0)?.length || 0,
+                splTokensUsdValue: balanceData.splTokensUsdValue,
+                splTokens: balanceData.splTokens
+                  ?.filter(t => t.usdValue > 0)
+                  ?.map(t => ({
+                    symbol: t.symbol,
+                    usdValue: t.usdValue
+                  })) || [],
                 totalUSD: balanceData.totalUSD,
+                calculatedTotal: (
+                  balanceData.usdValues.btc +
+                  balanceData.usdValues.eth +
+                  balanceData.usdValues.sol +
+                  balanceData.splTokensUsdValue
+                ).toFixed(2),
                 isLoading,
                 isRefreshing,
                 initialLoad
@@ -613,7 +861,7 @@ const TreasuryBalanceCounter = () => {
 
         {/* Refresh button with loading indicator */}
         <RefreshButton
-          secondary
+          secondary="true"
           onClick={handleRefresh}
           disabled={isLoading || isRefreshing}
         >

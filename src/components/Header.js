@@ -63,7 +63,7 @@ const NavLinks = styled.nav`
 `;
 
 const NavButton = styled.button`
-  color: ${props => props.active ? 'var(--text-primary)' : 'var(--text-secondary)'};
+  color: ${props => props.active === 'true' ? 'var(--text-primary)' : 'var(--text-secondary)'};
   font-weight: 500;
   transition: all 0.3s ease;
   text-decoration: none;
@@ -83,7 +83,7 @@ const NavButton = styled.button`
     background-color: rgba(255, 255, 255, 0.05);
   }
 
-  ${props => props.active && `
+  ${props => props.active === 'true' && `
     color: var(--text-primary);
     background-color: rgba(255, 255, 255, 0.05);
 
@@ -148,32 +148,32 @@ const Header = () => {
 
           <NavLinks>
             <NavButton
-              active={currentPath === '/'}
+              active={(currentPath === '/').toString()}
               onClick={() => navigateTo('/')}
             >
               Home
             </NavButton>
             <NavButton
-              active={currentPath === '/donate'}
+              active={(currentPath === '/donate').toString()}
               onClick={() => navigateTo('/donate')}
             >
               Donate
             </NavButton>
             <NavButton
-              active={currentPath === '/leaderboard'}
+              active={(currentPath === '/leaderboard').toString()}
               onClick={() => navigateTo('/leaderboard')}
             >
               Leaderboard
             </NavButton>
             <NavButton
-              active={currentPath === '/about'}
+              active={(currentPath === '/about').toString()}
               onClick={() => navigateTo('/about')}
             >
               About
             </NavButton>
             {isLoggedIn && (
               <NavButton
-                active={currentPath === '/profile'}
+                active={(currentPath === '/profile').toString()}
                 onClick={() => navigateTo('/profile')}
               >
                 Profile

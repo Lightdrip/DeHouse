@@ -23,6 +23,7 @@ export const DonationProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [leaderboard, setLeaderboard] = useState([]);
   const [isListenerActive, setIsListenerActive] = useState(false); // Track listener state
+  const isDev = process.env.NODE_ENV === 'development';
 
   // Callback to load leaderboard data
   const loadLeaderboard = useCallback(async () => {
@@ -69,6 +70,13 @@ export const DonationProvider = ({ children }) => {
   useEffect(() => {
     let isActive = true; // Prevent state updates if component unmounts during async ops
     console.log('[Context] Initializing blockchain listener...');
+    if (isDev) {
+      loadLeaderboard();
+      return () => {
+        isActive = false;
+        setIsListenerActive(false);
+      };
+    }
     blockchainListenerService.startListening()
         .then(() => {
             if (isActive) {

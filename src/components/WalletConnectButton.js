@@ -284,9 +284,6 @@ const WalletConnectButton = () => {
               <WalletTypeButton onClick={() => handleWalletSelect('solana')}>
                 Connect Solana Wallet
               </WalletTypeButton>
-              <WalletTypeButton onClick={() => handleWalletSelect('bitcoin')}>
-                Connect Bitcoin Wallet
-              </WalletTypeButton>
             </WalletTypeSelector>
           )}
         </>

@@ -19,7 +19,7 @@ const rainbowGradientAnimation = keyframes`
 `;
 
 export const Button = styled.button`
-  background-color: ${props => props.secondary ? 'var(--secondary)' : 'var(--primary)'};
+  background-color: ${props => props.secondary === 'true' ? 'var(--secondary)' : 'var(--primary)'};
   color: var(--text-primary);
   border: none;
   border-radius: 8px;
@@ -55,13 +55,24 @@ export const Button = styled.button`
   }
 
   &:hover {
-    background-color: ${props => props.secondary ? 'var(--secondary-dark)' : 'var(--primary-dark)'};
+    background-color: ${props => props.secondary === 'true' ? 'var(--secondary-dark)' : 'var(--primary-dark)'};
     transform: translateY(-2px);
     box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
 
     &::before {
       animation: ${rainbowGradientAnimation} 3s linear infinite;
     }
+  }
+
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.5);
+    transform: translateY(-1px);
+  }
+
+  &:active {
+    transform: translateY(0);
+    box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);
   }
 
   &:disabled {
@@ -122,19 +133,61 @@ export const Heading = styled.h1`
       default: return '48px';
     }
   }};
-  font-weight: 700;
-  margin-bottom: 24px;
-  background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  font-weight: ${props => props.weight || '700'};
+  margin-bottom: ${props => props.mb || '24px'};
   line-height: 1.2;
-`;
+  
+  color: #FFFFFF;
+  background: none;
+  -webkit-text-fill-color: initial;
+
+  @media (max-width: 768px) {
+    font-size: ${props => {
+      switch (props.level) {
+        case 1: return '36px';
+        case 2: return '28px';
+        case 3: return '24px';
+        case 4: return '20px';
+        default: return '36px';
+      }
+    }};
+  }
+
+  @media (max-width: 480px) {
+     font-size: ${props => {
+       switch (props.level) {
+         case 1: return '28px';
+         case 2: return '24px';
+         case 3: return '20px';
+         case 4: return '18px';
+         default: return '28px';
+       }
+     }};
+   }
+
+   @media (max-width: 360px) {
+     font-size: ${props => {
+       switch (props.level) {
+         case 1: return '24px';
+         case 2: return '22px';
+         case 3: return '18px';
+         case 4: return '16px';
+         default: return '24px';
+       }
+     }};
+   }
+ `;
 
 export const Text = styled.p`
   font-size: ${props => props.size || '16px'};
-  color: ${props => props.color || 'var(--text-secondary)'};
+  color: ${props => props.color || '#FFFFFF'} !important;
   margin-bottom: ${props => props.mb || '16px'};
   line-height: 1.6;
+  transition: color 0.3s ease;
+
+  &:hover, &:focus, &:active {
+    color: #FFFFFF !important;
+  }
 `;
 
 export const Badge = styled.span`

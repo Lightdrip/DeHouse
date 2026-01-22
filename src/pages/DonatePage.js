@@ -1,12 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import { Container, Section, Heading, Text, Button, Flex, Card, Input, Divider } from '../styles/StyledComponents';
 import WalletConnectButton from '../components/WalletConnectButton';
 import { useWallet } from '../utils/WalletContext';
 import { useDonation } from '../utils/DonationContext';
 import { QRCodeSVG } from 'qrcode.react';
-import { useNavigate } from 'react-router-dom';
-import databaseService from '../utils/DatabaseService';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 // Import crypto icons
 import btcIcon from '../assets/btc.svg';
@@ -19,7 +18,8 @@ const DonateSection = styled(Section)`
 `;
 
 const CryptoCard = styled(Card)`
-  margin-bottom: 32px;
+  margin-bottom: 48px;
+  scroll-margin-top: 100px; /* Space for fixed header */
 `;
 
 const CryptoHeader = styled(Flex)`
@@ -92,23 +92,245 @@ const SuccessMessage = styled.div`
   text-align: center;
 `;
 
-const DonatePage = () => {
-  const navigate = useNavigate();
-  const { isConnected, walletAddress, walletType } = useWallet();
-  const { recordDonation, verifyDonation, isLoading, loadUserData, loadLeaderboard } = useDonation();
+const JumpLinkContainer = styled(Flex)`
+  position: sticky;
+  top: 80px; /* Below header */
+  z-index: 100;
+  padding: 16px 0;
+  margin-bottom: 40px;
+`;
 
-  const [selectedCrypto, setSelectedCrypto] = useState('btc');
+const CryptoDonationCard = ({ 
+  cryptoId, 
+  cryptoInfo, 
+  cryptoAddresses, 
+  exchangeRates, 
+  lastUpdated, 
+  isLoadingPrices, 
+  fetchCryptoPrices 
+}) => {
+  const { isConnected } = useWallet();
+  const { verifyDonation, loadUserData, loadLeaderboard, isLoading } = useDonation();
+  const navigate = useNavigate();
+
   const [btcAddressType, setBtcAddressType] = useState('legacy');
   const [stablecoinNetwork, setStablecoinNetwork] = useState('eth');
   const [donationAmount, setDonationAmount] = useState('');
-  const [pointsEarned, setPointsEarned] = useState(0);
   const [usdValue, setUsdValue] = useState(0);
+  const [pointsEarned, setPointsEarned] = useState(0);
   const [donationSuccess, setDonationSuccess] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState('');
 
-  // State for live exchange rates
+  const getCurrentAddress = () => {
+    if (cryptoId === 'btc') {
+      return cryptoAddresses.btc[btcAddressType];
+    }
+    if (cryptoId === 'usdc') {
+      return cryptoAddresses.usdc[stablecoinNetwork];
+    }
+    return cryptoAddresses[cryptoId];
+  };
+
+  const handleAmountChange = (e) => {
+    const amount = e.target.value;
+    setDonationAmount(amount);
+    
+    if (amount && !isNaN(amount)) {
+      const usd = amount * exchangeRates[cryptoId];
+      setUsdValue(usd);
+      setPointsEarned(Math.floor(usd * 100));
+    } else {
+      setUsdValue(0);
+      setPointsEarned(0);
+    }
+  };
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    alert('Address copied to clipboard!');
+  };
+
+  const handleVerifyDonation = async () => {
+    if (!isConnected) {
+      alert('Please connect your wallet first');
+      return;
+    }
+
+    if (!donationAmount || donationAmount <= 0) {
+      alert('Please enter a valid donation amount');
+      return;
+    }
+
+    setVerificationStatus('verifying');
+
+    try {
+      const txHash = prompt(`Please enter the transaction hash of your ${cryptoInfo.name} donation:`);
+      
+      if (!txHash || txHash.trim() === '') {
+        alert('Transaction hash is required to verify your donation');
+        setVerificationStatus('');
+        return;
+      }
+      
+      const result = await verifyDonation(txHash, cryptoId);
+      
+      if (result.verified) {
+        await loadUserData();
+        await loadLeaderboard();
+        setDonationSuccess(true);
+        setVerificationStatus('success');
+      } else {
+        alert(`Verification failed: ${result.message || 'Could not verify transaction'}`);
+        setVerificationStatus('failed');
+      }
+    } catch (error) {
+      console.error('Error processing donation:', error);
+      setVerificationStatus('failed');
+    }
+  };
+
+  return (
+    <CryptoCard id={`${cryptoId}-section`}>
+      <CryptoHeader align="center">
+        <CryptoIcon src={cryptoInfo.icon} alt={cryptoInfo.name} />
+        <div>
+          <Heading level={3}>{cryptoInfo.name} Donation</Heading>
+          <Text>Send {cryptoInfo.symbol} to the address below</Text>
+        </div>
+      </CryptoHeader>
+
+      {donationSuccess ? (
+        <SuccessMessage>
+          <Heading level={4}>Donation Verified Successfully!</Heading>
+          <Text mb="8px">Thank you for your donation. Your points have been added to your account.</Text>
+          <Text mb="0">You earned <strong>{pointsEarned} points</strong> for your donation of {donationAmount} {cryptoInfo.symbol.split('/')[0]}.</Text>
+          <Button style={{ marginTop: '16px' }} onClick={() => navigate('/leaderboard')}>
+            View Leaderboard
+          </Button>
+        </SuccessMessage>
+      ) : (
+        <>
+          {cryptoId === 'btc' && (
+            <>
+              <Heading level={4}>Choose Bitcoin Address Type</Heading>
+              <Flex gap="16px" style={{ marginBottom: '24px' }}>
+                {['legacy', 'taproot', 'segwit'].map(type => (
+                  <Button 
+                    key={type}
+                    secondary={(btcAddressType !== type).toString()}
+                    onClick={() => setBtcAddressType(type)}
+                  >
+                    {type.charAt(0).toUpperCase() + type.slice(1)}
+                  </Button>
+                ))}
+              </Flex>
+            </>
+          )}
+
+          {cryptoId === 'usdc' && (
+            <>
+              <Heading level={4}>Choose Network for Stablecoins</Heading>
+              <Flex gap="16px" style={{ marginBottom: '24px' }}>
+                <Button 
+                  secondary={(stablecoinNetwork !== 'eth').toString()}
+                  onClick={() => setStablecoinNetwork('eth')}
+                >
+                  Ethereum (ERC-20)
+                </Button>
+                <Button 
+                  secondary={(stablecoinNetwork !== 'sol').toString()}
+                  onClick={() => setStablecoinNetwork('sol')}
+                >
+                  Solana (SPL)
+                </Button>
+              </Flex>
+            </>
+          )}
+
+          <AddressContainer>
+            <AddressText>{getCurrentAddress()}</AddressText>
+            <CopyButton onClick={() => copyToClipboard(getCurrentAddress())}>Copy</CopyButton>
+          </AddressContainer>
+
+          <Flex justify="center" style={{ marginBottom: '24px' }}>
+            <QRCodeContainer>
+              <QRCodeSVG
+                value={getCurrentAddress()}
+                size={180}
+                bgColor={"#ffffff"}
+                fgColor={"#000000"}
+                level={"L"}
+                includeMargin={false}
+              />
+              <QRCodeLabel>Scan to send {cryptoInfo.symbol.split('/')[0]}</QRCodeLabel>
+            </QRCodeContainer>
+          </Flex>
+
+          <Divider />
+
+          <Heading level={4}>Donation Amount</Heading>
+          <Text mb="16px">Enter the amount you plan to donate to calculate your points</Text>
+
+          <Flex justify="center" align="center" style={{ marginBottom: '16px' }}>
+            <Text size="14px" mb="0" style={{ color: 'var(--text-secondary)' }}>
+              Current {cryptoInfo.name} Price: ${exchangeRates[cryptoId].toLocaleString()} USD
+              {lastUpdated && <span> · Updated {lastUpdated.toLocaleTimeString()}</span>}
+              {isLoadingPrices && <span> · Refreshing...</span>}
+            </Text>
+            <Button
+              style={{
+                marginLeft: '8px',
+                padding: '4px 8px',
+                fontSize: '12px',
+                backgroundColor: 'transparent',
+                border: '1px solid var(--primary)'
+              }}
+              onClick={fetchCryptoPrices}
+              disabled={isLoadingPrices}
+            >
+              Refresh
+            </Button>
+          </Flex>
+
+          <AmountInput align="center" gap="16px" wrap="wrap">
+            <Input
+              type="number"
+              placeholder="0.00"
+              style={{ maxWidth: '150px' }}
+              value={donationAmount}
+              onChange={handleAmountChange}
+            />
+            <Text size="18px" mb="0">{cryptoInfo.symbol.split('/')[0]}</Text>
+            <Text size="18px" mb="0">≈ ${usdValue.toFixed(2)} USD</Text>
+            <Text size="18px" mb="0" style={{ color: 'var(--primary)' }}>{pointsEarned} Points</Text>
+          </AmountInput>
+
+          <Text>After sending your donation, connect your wallet to verify the transaction and claim your points.</Text>
+
+          <Flex justify="center" style={{ marginTop: '32px' }}>
+            {!isConnected ? (
+              <WalletConnectButton />
+            ) : (
+              <Button
+                onClick={handleVerifyDonation}
+                disabled={isLoading || verificationStatus === 'verifying'}
+              >
+                {verificationStatus === 'verifying' ? 'Verifying...' : 'Verify Donation'}
+              </Button>
+            )}
+          </Flex>
+        </>
+      )}
+    </CryptoCard>
+  );
+};
+
+const DonatePage = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [exchangeRates, setExchangeRates] = useState({
-    btc: 60000, // Default fallback values
+    btc: 60000,
     eth: 3000,
     sol: 150,
     usdc: 1
@@ -126,8 +348,8 @@ const DonatePage = () => {
     eth: '0x8262ab131e3f52315d700308152e166909ecfa47',
     sol: '2n8etcRuK49GUMXWi2QRtQ8YwS6nTDEUjfX7LcvKFyiV',
     usdc: {
-      eth: '0x8262ab131e3f52315d700308152e166909ecfa47', // ETH address for ERC-20 stablecoins
-      sol: '2n8etcRuK49GUMXWi2QRtQ8YwS6nTDEUjfX7LcvKFyiV'  // SOL address for SPL stablecoins
+      eth: '0x8262ab131e3f52315d700308152e166909ecfa47',
+      sol: '2n8etcRuK49GUMXWi2QRtQ8YwS6nTDEUjfX7LcvKFyiV'
     }
   };
 
@@ -138,36 +360,20 @@ const DonatePage = () => {
     usdc: { name: 'Stablecoins', symbol: 'USDC/USDT/DAI', icon: usdcIcon }
   };
 
-  // Function to fetch current cryptocurrency prices
   const fetchCryptoPrices = async () => {
     setIsLoadingPrices(true);
     setPriceError(null);
-
     try {
-      // Using CoinGecko API to get current prices
-      const response = await fetch(
-        'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd'
-      );
-
+      const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd');
       if (response.ok) {
         const data = await response.json();
-        const newRates = {
+        setExchangeRates({
           btc: data.bitcoin?.usd || exchangeRates.btc,
           eth: data.ethereum?.usd || exchangeRates.eth,
           sol: data.solana?.usd || exchangeRates.sol,
-          usdc: 1 // Stablecoins are always ~$1
-        };
-
-        setExchangeRates(newRates);
+          usdc: 1
+        });
         setLastUpdated(new Date());
-
-        // If donation amount is already entered, recalculate with new rates
-        if (donationAmount) {
-          const usd = donationAmount * newRates[selectedCrypto];
-          setUsdValue(usd);
-          const points = Math.floor(usd * 100);
-          setPointsEarned(points);
-        }
       } else {
         throw new Error('Failed to fetch prices');
       }
@@ -179,374 +385,83 @@ const DonatePage = () => {
     }
   };
 
-  // Check URL parameters for crypto selection and fetch prices on load
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const cryptoParam = urlParams.get('crypto');
-    if (cryptoParam && cryptoInfo[cryptoParam]) {
-      setSelectedCrypto(cryptoParam);
+  const scrollToSection = useCallback((cryptoId) => {
+    const sectionId = `${cryptoId}-section`;
+    const element = document.getElementById(sectionId);
+    
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      console.error(`Target section "${sectionId}" not found for scrolling.`);
+      // Fallback: scroll to top of donation section
+      const mainSection = document.getElementById('donation-section');
+      if (mainSection) {
+        mainSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
     }
+  }, []);
 
-    // Fetch prices when component mounts
+  useEffect(() => {
     fetchCryptoPrices();
-
-    // Set up interval to refresh prices every 60 seconds
     const intervalId = setInterval(fetchCryptoPrices, 60000);
-
-    // Clean up interval on component unmount
     return () => clearInterval(intervalId);
   }, []);
 
-  const handleCryptoSelect = (crypto) => {
-    setSelectedCrypto(crypto);
-    setDonationAmount('');
-    setPointsEarned(0);
-    setUsdValue(0);
-    setDonationSuccess(false);
-    setVerificationStatus('');
-
-    // Refresh prices when crypto is changed
-    fetchCryptoPrices();
-  };
-
-  const handleAmountChange = (e) => {
-    const amount = e.target.value;
-    setDonationAmount(amount);
-
-    // Calculate USD value
-    const usd = amount * exchangeRates[selectedCrypto];
-    setUsdValue(usd);
-
-    // Calculate points (10 points per $0.10)
-    const points = Math.floor(usd * 100);
-    setPointsEarned(points);
-  };
-
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text)
-      .then(() => {
-        alert('Address copied to clipboard!');
-      })
-      .catch(err => {
-        console.error('Failed to copy: ', err);
-      });
-  };
-
-  const getCurrentAddress = () => {
-    if (selectedCrypto === 'btc') {
-      return cryptoAddresses.btc[btcAddressType];
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const cryptoParam = urlParams.get('crypto');
+    const scrollParam = urlParams.get('scroll');
+    
+    if (cryptoParam && cryptoInfo[cryptoParam] && scrollParam === 'true') {
+      // Delay slightly to ensure elements are rendered
+      const timer = setTimeout(() => {
+        scrollToSection(cryptoParam);
+      }, 300);
+      return () => clearTimeout(timer);
     }
-    if (selectedCrypto === 'usdc') {
-      // For stablecoins, use the selected network (eth or sol)
-      return cryptoAddresses.usdc[stablecoinNetwork];
-    }
-    return cryptoAddresses[selectedCrypto];
-  };
-
-  // This is a completely direct method to add a wallet to the leaderboard
-  // It bypasses all blockchain verification and directly updates the database
-  const addWalletToLeaderboard = async (walletToAdd, donationAmount, cryptoCurrency) => {
-    try {
-      // Normalize the wallet address
-      const normalizedWallet = walletToAdd.toLowerCase();
-
-      // Get the current exchange rate for the selected cryptocurrency
-      const rate = exchangeRates[cryptoCurrency];
-      const usdValue = parseFloat(donationAmount) * rate;
-      const points = Math.floor(usdValue * 100); // 100 points per $1
-
-      console.log(`DIRECT ADD: Adding wallet ${normalizedWallet} with ${points} points ($${usdValue} USD)`);
-
-      // Generate a unique ID for this donation
-      const donationId = `direct_${Date.now().toString(16)}_${Math.random().toString(16).substring(2, 8)}`;
-
-      // 1. Directly add an entry to the leaderboard store
-      const db = await databaseService.dbPromise;
-      const tx = db.transaction(['leaderboard', 'donations'], 'readwrite');
-
-      // Get existing leaderboard entry if any
-      const leaderboardStore = tx.objectStore('leaderboard');
-      const existingEntry = await leaderboardStore.get(normalizedWallet);
-
-      // Create new or update existing entry
-      const newEntry = {
-        walletAddress: normalizedWallet,
-        points: (existingEntry?.points || 0) + points,
-        totalDonated: (existingEntry?.totalDonated || 0) + usdValue,
-        donationCount: (existingEntry?.donationCount || 0) + 1,
-        lastDonation: Date.now()
-      };
-
-      // Update the leaderboard
-      await leaderboardStore.put(newEntry);
-
-      // 2. Also add a donation record
-      const donationStore = tx.objectStore('donations');
-      const donationData = {
-        id: donationId,
-        timestamp: Date.now(),
-        walletAddress: normalizedWallet,
-        amount: parseFloat(donationAmount),
-        currency: cryptoCurrency.toUpperCase(),
-        usdValue: usdValue,
-        points: points,
-        txHash: `direct_${donationId}`,
-        chain: cryptoCurrency === 'sol' ? 'SOL' : (cryptoCurrency === 'btc' ? 'BTC' : 'ETH'),
-      };
-
-      await donationStore.add(donationData);
-
-      // Wait for transaction to complete
-      await tx.done;
-
-      console.log('DIRECT ADD: Successfully added wallet to leaderboard and recorded donation');
-      return true;
-    } catch (error) {
-      console.error('DIRECT ADD: Error adding wallet to leaderboard:', error);
-      return false;
-    }
-  };
-
-  const handleVerifyDonation = async () => {
-    if (!isConnected) {
-      alert('Please connect your wallet first');
-      return;
-    }
-
-    if (!donationAmount || donationAmount <= 0) {
-      alert('Please enter a valid donation amount');
-      return;
-    }
-
-    setVerificationStatus('verifying');
-
-    try {
-      // Prompt user for transaction hash
-      const txHash = prompt('Please enter the transaction hash of your donation:');
-      
-      if (!txHash || txHash.trim() === '') {
-        alert('Transaction hash is required to verify your donation');
-        setVerificationStatus('');
-        return;
-      }
-      
-      // Use the verifyDonation method from DonationContext to verify the transaction
-      const result = await verifyDonation(txHash, selectedCrypto);
-      
-      if (result.verified) {
-        console.log('Donation verified successfully');
-        
-        // Reload user data and leaderboard to reflect the changes
-        await loadUserData();
-        await loadLeaderboard();
-        
-        setDonationSuccess(true);
-        setVerificationStatus('success');
-      } else {
-        console.error('Donation verification failed:', result.message);
-        alert(`Verification failed: ${result.message || 'Could not verify transaction'}`);
-        setVerificationStatus('failed');
-      }
-    } catch (error) {
-      console.error('Error processing donation:', error);
-      setVerificationStatus('failed');
-    }
-  };
-
-  const renderAddressOptions = () => {
-    if (selectedCrypto === 'btc') {
-      return (
-        <>
-          <Heading level={4}>Choose Bitcoin Address Type</Heading>
-          <Flex gap="16px" style={{ marginBottom: '24px' }}>
-            <Button
-              secondary={btcAddressType !== 'legacy'}
-              onClick={() => setBtcAddressType('legacy')}
-            >
-              Legacy
-            </Button>
-            <Button
-              secondary={btcAddressType !== 'taproot'}
-              onClick={() => setBtcAddressType('taproot')}
-            >
-              Taproot
-            </Button>
-            <Button
-              secondary={btcAddressType !== 'segwit'}
-              onClick={() => setBtcAddressType('segwit')}
-            >
-              Native Segwit
-            </Button>
-          </Flex>
-        </>
-      );
-    }
-
-    if (selectedCrypto === 'usdc') {
-      return (
-        <>
-          <Heading level={4}>Choose Network for Stablecoins</Heading>
-          <Flex gap="16px" style={{ marginBottom: '24px' }}>
-            <Button
-              secondary={stablecoinNetwork !== 'eth'}
-              onClick={() => setStablecoinNetwork('eth')}
-            >
-              Ethereum (ERC-20)
-            </Button>
-            <Button
-              secondary={stablecoinNetwork !== 'sol'}
-              onClick={() => setStablecoinNetwork('sol')}
-            >
-              Solana (SPL)
-            </Button>
-          </Flex>
-        </>
-      );
-    }
-
-    return null;
-  };
+  }, [location.search, scrollToSection]);
 
   return (
-    <DonateSection>
+    <DonateSection id="donation-section">
       <Container>
         <Heading level={1}>Donate to the deHouse DAO Treasury</Heading>
         <Text size="18px" mb="40px">
-          Support our mission by donating cryptocurrency. Every $0.10 worth of crypto earns you 10 points on our leaderboard.
+          Support our mission by donating to the treasury. Every $1 worth of crypto donated earns you 100 points on our leaderboard.
         </Text>
 
-        <Flex gap="24px" wrap="wrap" style={{ marginBottom: '40px' }}>
+        <JumpLinkContainer gap="24px" wrap="wrap" justify="center">
           {Object.keys(cryptoInfo).map(crypto => (
             <Button
               key={crypto}
-              secondary={selectedCrypto !== crypto}
-              onClick={() => handleCryptoSelect(crypto)}
+              secondary="true"
+              onClick={() => scrollToSection(crypto)}
+              aria-label={`Scroll to ${cryptoInfo[crypto].name} section`}
             >
               {cryptoInfo[crypto].name}
             </Button>
           ))}
+        </JumpLinkContainer>
+
+        {priceError && (
+          <Text size="14px" mb="16px" style={{ color: 'var(--warning)', textAlign: 'center' }}>
+            {priceError}
+          </Text>
+        )}
+
+        <Flex direction="column" gap="48px">
+          {Object.keys(cryptoInfo).map(cryptoId => (
+            <CryptoDonationCard
+              key={cryptoId}
+              cryptoId={cryptoId}
+              cryptoInfo={cryptoInfo[cryptoId]}
+              cryptoAddresses={cryptoAddresses}
+              exchangeRates={exchangeRates}
+              lastUpdated={lastUpdated}
+              isLoadingPrices={isLoadingPrices}
+              fetchCryptoPrices={fetchCryptoPrices}
+            />
+          ))}
         </Flex>
-
-        <CryptoCard>
-          <CryptoHeader align="center">
-            <CryptoIcon src={cryptoInfo[selectedCrypto].icon} alt={cryptoInfo[selectedCrypto].name} />
-            <div>
-              <Heading level={3}>{cryptoInfo[selectedCrypto].name} Donation</Heading>
-              <Text>Send {cryptoInfo[selectedCrypto].symbol} to the address below</Text>
-            </div>
-          </CryptoHeader>
-
-          {donationSuccess ? (
-            <SuccessMessage>
-              <Heading level={4}>Donation Verified Successfully!</Heading>
-              <Text mb="8px">Thank you for your donation. Your points have been added to your account.</Text>
-              <Text mb="0">You earned <strong>{pointsEarned} points</strong> for your donation of {donationAmount} {cryptoInfo[selectedCrypto].symbol.split('/')[0]}.</Text>
-              <Button style={{ marginTop: '16px' }} onClick={() => navigate('/leaderboard')}>
-                View Leaderboard
-              </Button>
-            </SuccessMessage>
-          ) : (
-            <>
-              {renderAddressOptions()}
-
-              <AddressContainer>
-                <AddressText>
-                  {getCurrentAddress()}
-                </AddressText>
-                <CopyButton onClick={() => copyToClipboard(getCurrentAddress())}>Copy</CopyButton>
-              </AddressContainer>
-
-              <Flex justify="center" style={{ marginBottom: '24px' }}>
-                <QRCodeContainer>
-                  <QRCodeSVG
-                    value={getCurrentAddress()}
-                    size={180}
-                    bgColor={"#ffffff"}
-                    fgColor={"#000000"}
-                    level={"L"}
-                    includeMargin={false}
-                  />
-                  <QRCodeLabel>Scan to send {cryptoInfo[selectedCrypto].symbol.split('/')[0]}</QRCodeLabel>
-                </QRCodeContainer>
-              </Flex>
-
-              <Divider />
-
-              <Heading level={4}>Donation Amount</Heading>
-              <Text mb="16px">
-                Enter the amount you plan to donate to calculate your points
-              </Text>
-
-              {/* Price information */}
-              <Flex justify="center" align="center" style={{ marginBottom: '16px' }}>
-                <Text size="14px" mb="0" style={{ color: 'var(--text-secondary)' }}>
-                  Current {cryptoInfo[selectedCrypto].name} Price: ${exchangeRates[selectedCrypto].toLocaleString()} USD
-                  {lastUpdated && (
-                    <span> · Updated {lastUpdated.toLocaleString()}</span>
-                  )}
-                  {isLoadingPrices && (
-                    <span> · Refreshing...</span>
-                  )}
-                </Text>
-                <Button
-                  style={{
-                    marginLeft: '8px',
-                    padding: '4px 8px',
-                    fontSize: '12px',
-                    backgroundColor: 'transparent',
-                    border: '1px solid var(--primary)'
-                  }}
-                  onClick={fetchCryptoPrices}
-                  disabled={isLoadingPrices}
-                >
-                  Refresh
-                </Button>
-              </Flex>
-
-              {priceError && (
-                <Text size="14px" mb="16px" style={{ color: 'var(--warning)', textAlign: 'center' }}>
-                  {priceError}
-                </Text>
-              )}
-
-              <AmountInput align="center" gap="16px">
-                <Input
-                  type="number"
-                  placeholder="0.00"
-                  style={{ maxWidth: '200px' }}
-                  value={donationAmount}
-                  onChange={handleAmountChange}
-                />
-                <Text size="18px" mb="0">{cryptoInfo[selectedCrypto].symbol.split('/')[0]}</Text>
-                <Text size="18px" mb="0">≈ ${usdValue.toFixed(2)} USD</Text>
-                <Text size="18px" mb="0" style={{ color: 'var(--primary)' }}>{pointsEarned} Points</Text>
-              </AmountInput>
-
-              <Text>
-                After sending your donation, connect your wallet to verify the transaction and claim your points.
-              </Text>
-
-              <Flex justify="center" style={{ marginTop: '32px' }}>
-                {!isConnected ? (
-                  <WalletConnectButton />
-                ) : (
-                  <Button
-                    onClick={handleVerifyDonation}
-                    disabled={isLoading || verificationStatus === 'verifying'}
-                  >
-                    {verificationStatus === 'verifying' ? 'Verifying...' : 'Verify Donation'}
-                  </Button>
-                )}
-              </Flex>
-
-              {verificationStatus === 'failed' && (
-                <Text style={{ color: 'var(--error)', textAlign: 'center', marginTop: '16px' }}>
-                  Verification failed. Please make sure you've sent the donation and try again.
-                </Text>
-              )}
-            </>
-          )}
-        </CryptoCard>
       </Container>
     </DonateSection>
   );
