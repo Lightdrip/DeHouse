@@ -1,3 +1,6 @@
+
+<img width="1024" height="1536" alt="delogo1" src="https://github.com/user-attachments/assets/69972212-d512-4e03-b538-5a9eda61f997" />
+
 # DeHouse - RWA Co-Ownership Platform - Revolutionizing RWA co-ownership through blockchain technology
 
 DeHouse is a modern, decentralized web application designed to revolutionize charitable giving through blockchain technology. By leveraging the transparency and efficiency of Web3, DeHouse enables seamless cryptocurrency donations, ensuring that funds reach those in need with minimal friction.
