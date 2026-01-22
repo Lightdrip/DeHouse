@@ -517,6 +517,44 @@ export class TreasuryBalanceService {
     // List of providers to try
     const providers = [
       {
+        name: 'Cloudflare RPC',
+        fn: async () => {
+          const response = await fetch('https://cloudflare-eth.com', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: 1,
+              method: 'eth_getBalance',
+              params: [ETH_ADDRESS, 'latest']
+            })
+          });
+          if (!response.ok) throw new Error(`Status ${response.status}`);
+          const data = await response.json();
+          if (!data.result) throw new Error('No result in response');
+          return Number(BigInt(data.result)) / 1e18;
+        }
+      },
+      {
+        name: 'Ankr RPC',
+        fn: async () => {
+          const response = await fetch('https://rpc.ankr.com/eth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: 1,
+              method: 'eth_getBalance',
+              params: [ETH_ADDRESS, 'latest']
+            })
+          });
+          if (!response.ok) throw new Error(`Status ${response.status}`);
+          const data = await response.json();
+          if (!data.result) throw new Error('No result in response');
+          return Number(BigInt(data.result)) / 1e18;
+        }
+      },
+      {
         name: 'Etherscan',
         fn: async () => {
           const url = `${ETHERSCAN_API}?module=account&action=balance&address=${ETH_ADDRESS}&tag=latest&apikey=${ETHERSCAN_API_KEY}`;
