@@ -79,6 +79,16 @@ const HeroButtons = styled(Flex)`
   @media (max-width: 992px) {
     justify-content: center;
   }
+
+  @media (max-width: 480px) {
+    flex-direction: column;
+    width: 100%;
+    gap: 16px;
+
+    button {
+      width: 100%;
+    }
+  }
 `;
 
 const SerifItalic = styled.span`
@@ -188,10 +198,10 @@ const FeatureCard = styled(Card)`
 const FeatureContentWrapper = styled.div`
   overflow: hidden;
   transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  max-height: ${props => props.isExpanded ? '1200px' : '140px'};
+  max-height: ${props => props.$isExpanded ? '1200px' : '140px'};
   position: relative;
 
-  ${props => !props.isExpanded && css`
+  ${props => !props.$isExpanded && css`
     &::after {
       content: '';
       position: absolute;
@@ -219,7 +229,7 @@ const FeatureItem = styled.li`
   color: var(--text-secondary);
   line-height: 1.4;
 
-  ${props => !props.isExpanded && css`
+  ${props => !props.$isExpanded && css`
     display: -webkit-box;
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
@@ -287,7 +297,6 @@ const ExpandableFeatureCard = ({ icon: Icon, title, items }) => {
   return (
     <FeatureCard 
       as="article" 
-      isExpanded={isExpanded}
       role="region"
       aria-labelledby={`heading-${title.replace(/\s+/g, '-').toLowerCase()}`}
     >
@@ -302,12 +311,12 @@ const ExpandableFeatureCard = ({ icon: Icon, title, items }) => {
       
       <FeatureContentWrapper 
         id={`content-${title.replace(/\s+/g, '-').toLowerCase()}`}
-        isExpanded={isExpanded} 
+        $isExpanded={isExpanded} 
         ref={contentRef}
       >
         <FeatureList>
           {items.map((item, idx) => (
-            <FeatureItem key={idx} isExpanded={isExpanded}>
+            <FeatureItem key={idx} $isExpanded={isExpanded}>
               <strong>{item.title}</strong>
               {item.description}
             </FeatureItem>

@@ -12,6 +12,8 @@ import AboutPage from './pages/AboutPage';
 import ProfilePage from './pages/ProfilePage';
 import { WalletProvider } from './utils/WalletContext';
 import { DonationProvider } from './utils/DonationContext';
+import { WaitlistProvider } from './utils/WaitlistContext';
+import WaitlistModal from './components/WaitlistModal';
 
 // Video background component
 const VideoBackground = () => {
@@ -61,33 +63,36 @@ const App = () => {
     <WalletProvider>
       <UserProvider>
       <DonationProvider>
-        <Router>
-          <GlobalStyle />
-          <VideoBackground />
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            zIndex: 99999
-          }}>
-            <Header />
-          </div>
-          <main style={{
-            position: 'relative',
-            zIndex: 1,
-            marginTop: '80px' /* Add margin to accommodate fixed header */
-          }}>
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/donate" element={<DonatePage />} />
-              <Route path="/leaderboard" element={<LeaderboardPage />} />
-              <Route path="/about" element={<AboutPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
-            </Routes>
-          </main>
-          <Footer />
-        </Router>
+        <WaitlistProvider>
+          <Router>
+            <GlobalStyle />
+            <WaitlistModal />
+            <VideoBackground />
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              zIndex: 99999
+            }}>
+              <Header />
+            </div>
+            <main style={{
+              position: 'relative',
+              zIndex: 1,
+              marginTop: '80px' /* Add margin to accommodate fixed header */
+            }}>
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/donate" element={<DonatePage />} />
+                <Route path="/leaderboard" element={<LeaderboardPage />} />
+                <Route path="/about" element={<AboutPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
+              </Routes>
+            </main>
+            <Footer />
+          </Router>
+        </WaitlistProvider>
       </DonationProvider>
       </UserProvider>
     </WalletProvider>

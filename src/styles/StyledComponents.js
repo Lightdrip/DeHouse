@@ -107,6 +107,12 @@ export const Flex = styled.div`
   align-items: ${props => props.align || 'stretch'};
   flex-wrap: ${props => props.wrap || 'nowrap'};
   gap: ${props => props.gap || '0'};
+
+  @media (max-width: 768px) {
+    flex-direction: ${props => props.mobileDirection || props.direction || 'row'};
+    gap: ${props => props.mobileGap || props.gap || '0'};
+    align-items: ${props => props.mobileAlign || props.align || 'stretch'};
+  }
 `;
 
 export const Grid = styled.div`

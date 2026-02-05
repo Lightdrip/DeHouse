@@ -55,6 +55,11 @@ const CounterCard = styled(Card)`
   @media (max-width: 992px) {
     margin-top: 20px;
   }
+
+  @media (max-width: 480px) {
+    padding: 16px;
+    min-height: auto;
+  }
 `;
 
 const CounterContent = styled.div`
@@ -78,6 +83,11 @@ const TotalAmount = styled.div`
   letter-spacing: -0.5px;
   animation: ${gradientAnimation} 6s linear infinite;
   transform: translateZ(0); /* Hardware acceleration */
+  word-break: break-all;
+
+  @media (max-width: 480px) {
+    font-size: 32px;
+  }
 `;
 
 const RefreshButton = styled(Button)`

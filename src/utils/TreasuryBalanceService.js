@@ -1740,6 +1740,51 @@ export class TreasuryBalanceService {
 
     try {
       console.log('Fetching all treasury balances...');
+
+      // Try fetching from server API first (server-side caching)
+      try {
+        console.log('Attempting to fetch from server API...');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
+        
+        const response = await fetch('/api/treasury', {
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Server API response:', data);
+          
+          if (data) {
+            console.log('Successfully fetched data from server API');
+            
+            // Update balances if present
+            if (data.btc !== undefined) this.balances.btc = data.btc;
+            if (data.eth !== undefined) this.balances.eth = data.eth;
+            if (data.sol !== undefined) this.balances.sol = data.sol;
+            
+            // Update prices if present
+            if (data.prices) {
+              this.prices = {
+                btc: data.prices.btc || this.prices.btc,
+                eth: data.prices.eth || this.prices.eth,
+                sol: data.prices.sol || this.prices.sol
+              };
+            }
+            
+            this.lastUpdated = new Date();
+            this.saveToCache();
+            this.isFetching = false;
+            this.notifySubscribers();
+            return this.getBalances();
+          }
+        }
+      } catch (apiError) {
+        console.warn('Server API fetch failed, falling back to client-side fetching:', apiError);
+      }
+
       const startTime = performance.now();
 
       // First fetch current prices with a timeout

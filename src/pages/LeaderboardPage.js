@@ -353,6 +353,13 @@ const LeaderboardPage = () => {
     }
   };
 
+  // Handle downloading waitlist
+  const handleDownloadWaitlist = () => {
+    // Open the API endpoint in a new tab to trigger download
+    window.open('/api/admin-waitlist?format=csv', '_blank');
+  };
+
+  // Calculate pagination
   // Leaderboard data from context
   const leaderboardData = formatLeaderboardData(leaderboard);
 
@@ -540,7 +547,7 @@ const LeaderboardPage = () => {
               Ranking of the top contributors to the deHouse DAO Treasury.
             </Text>
             <Text size="18px" mb="10px">
-              Every $0.10 donated earns 10 points.
+              Every $1 donated earns 100 points.
             </Text>
 
             <LeaderboardCard>
@@ -667,12 +674,23 @@ const LeaderboardPage = () => {
                         <Text style={{ color: 'green' }}>Wallet added successfully!</Text>
                       )}
                       {addWalletSuccess === false && (
-                        <Text style={{ color: 'red' }}>Failed to add wallet. Check console for errors.</Text>
-                      )}
-                    </Flex>
-                  </Card>
+                    <Text style={{ color: 'red' }}>Failed to add wallet. Check console for errors.</Text>
+                  )}
+                </Flex>
+              </Card>
 
-                  {/* Clear Database Section */}
+              {/* Waitlist Management Section */}
+              <Card style={{ padding: '16px', marginBottom: '24px' }}>
+                <Heading level={4} style={{ marginBottom: '16px' }}>Waitlist Management</Heading>
+                <Flex direction="column" gap="16px">
+                  <Text>Download the current waitlist as a CSV file.</Text>
+                  <AdminButton onClick={handleDownloadWaitlist}>
+                    Download Waitlist CSV
+                  </AdminButton>
+                </Flex>
+              </Card>
+
+              {/* Clear Database Section */}
                   <AdminButton
                     onClick={handleClearDatabase}
                     disabled={isClearing}

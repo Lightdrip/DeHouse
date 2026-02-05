@@ -4,6 +4,7 @@ import { Container, Flex, Heading, Text } from '../styles/StyledComponents';
 import WalletConnectButton from './WalletConnectButton';
 import { useLocation } from 'react-router-dom';
 import { useUser } from '../utils/UserContext';
+import { useWaitlist } from '../utils/WaitlistContext';
 
 const HeaderContainer = styled.header`
   padding: 20px 0;
@@ -108,24 +109,79 @@ const MobileMenuButton = styled.button`
   color: var(--text-primary);
   font-size: 24px;
   cursor: pointer;
+  z-index: 10001;
+  padding: 8px;
 
   @media (max-width: 768px) {
     display: block;
   }
 `;
 
+const MobileNavOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  background-color: rgba(15, 22, 36, 0.98);
+  backdrop-filter: blur(20px);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: ${props => props.isOpen ? '1' : '0'};
+  visibility: ${props => props.isOpen ? 'visible' : 'hidden'};
+  transition: all 0.3s ease-in-out;
+`;
+
+const MobileNavLinks = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  align-items: center;
+  width: 100%;
+`;
+
+const MobileNavLink = styled(NavButton)`
+  font-size: 24px;
+  width: 100%;
+  text-align: center;
+  padding: 16px;
+  
+  &::after {
+    bottom: 10px;
+  }
+`;
+
 const Header = () => {
   const location = useLocation();
   const { isLoggedIn } = useUser();
+  const { openWaitlist } = useWaitlist();
   const [currentPath, setCurrentPath] = useState('/');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Update current path when location changes
   useEffect(() => {
     setCurrentPath(location.pathname);
+    setIsMobileMenuOpen(false); // Close menu on route change
   }, [location]);
+
+  // Lock body scroll when menu is open
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isMobileMenuOpen]);
 
   // Direct navigation function that forces a page reload when navigating from leaderboard
   const navigateTo = (path) => {
+    setIsMobileMenuOpen(false);
     // If we're on the leaderboard page, use a more direct approach
     if (currentPath === '/leaderboard') {
       // Use direct window.location for more reliable navigation
@@ -147,45 +203,44 @@ const Header = () => {
           </Logo>
 
           <NavLinks>
-            <NavButton
-              active={(currentPath === '/').toString()}
-              onClick={() => navigateTo('/')}
-            >
-              Home
-            </NavButton>
-            <NavButton
-              active={(currentPath === '/donate').toString()}
-              onClick={() => navigateTo('/donate')}
-            >
-              Donate
-            </NavButton>
-            <NavButton
-              active={(currentPath === '/leaderboard').toString()}
-              onClick={() => navigateTo('/leaderboard')}
-            >
-              Leaderboard
-            </NavButton>
-            <NavButton
-              active={(currentPath === '/about').toString()}
-              onClick={() => navigateTo('/about')}
-            >
-              About
-            </NavButton>
-            {isLoggedIn && (
-              <NavButton
-                active={(currentPath === '/profile').toString()}
-                onClick={() => navigateTo('/profile')}
-              >
-                Profile
-              </NavButton>
+            <NavButton onClick={() => navigateTo('/')} active={(currentPath === '/').toString()}>Home</NavButton>
+            <NavButton onClick={() => navigateTo('/donate')} active={(currentPath === '/donate').toString()}>Donate</NavButton>
+            <NavButton onClick={() => navigateTo('/leaderboard')} active={(currentPath === '/leaderboard').toString()}>Leaderboard</NavButton>
+            <NavButton onClick={() => navigateTo('/about')} active={(currentPath === '/about').toString()}>About</NavButton>
+            
+            {/* Show Waitlist button if user is not logged in */}
+            {!isLoggedIn && (
+              <NavButton onClick={openWaitlist}>Join Waitlist</NavButton>
             )}
+            
+            <WalletConnectButton />
           </NavLinks>
 
-          <WalletConnectButton />
-
-          <MobileMenuButton>☰</MobileMenuButton>
+          <MobileMenuButton onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} aria-label="Toggle menu">
+            {isMobileMenuOpen ? '✕' : '☰'}
+          </MobileMenuButton>
         </Flex>
       </Container>
+
+      <MobileNavOverlay isOpen={isMobileMenuOpen}>
+        <MobileNavLinks>
+          <MobileNavLink onClick={() => navigateTo('/')} active={(currentPath === '/').toString()}>Home</MobileNavLink>
+          <MobileNavLink onClick={() => navigateTo('/donate')} active={(currentPath === '/donate').toString()}>Donate</MobileNavLink>
+          <MobileNavLink onClick={() => navigateTo('/leaderboard')} active={(currentPath === '/leaderboard').toString()}>Leaderboard</MobileNavLink>
+          <MobileNavLink onClick={() => navigateTo('/about')} active={(currentPath === '/about').toString()}>About</MobileNavLink>
+          
+          {!isLoggedIn && (
+            <MobileNavLink onClick={() => {
+              setIsMobileMenuOpen(false);
+              openWaitlist();
+            }}>Join Waitlist</MobileNavLink>
+          )}
+          
+          <div style={{ marginTop: '20px' }}>
+            <WalletConnectButton />
+          </div>
+        </MobileNavLinks>
+      </MobileNavOverlay>
     </HeaderContainer>
   );
 };

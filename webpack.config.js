@@ -6,7 +6,7 @@ const Dotenv = require('dotenv-webpack');
 module.exports = {
   entry: './src/index.js',
   output: {
-    path: path.resolve(__dirname, 'dist'),
+    path: path.resolve(__dirname, 'public'),
     filename: 'bundle.js',
     publicPath: '/'
   },
@@ -38,7 +38,7 @@ module.exports = {
   },
   plugins: [
     new HtmlWebpackPlugin({
-      template: './public/index.html'
+      template: './src/index.html'
     }),
     new webpack.ProvidePlugin({
       Buffer: ['buffer', 'Buffer'],
@@ -51,7 +51,7 @@ module.exports = {
   ],
   devServer: {
     historyApiFallback: true,
-    port: 3000,
+    port: 3001,
     hot: true,
     proxy: [
       {
@@ -65,6 +65,12 @@ module.exports = {
         context: ['/solana-rpc'],
         target: 'https://api.mainnet-beta.solana.com',
         pathRewrite: { '^/solana-rpc': '' },
+        changeOrigin: true,
+        secure: true
+      },
+      {
+        context: ['/api'],
+        target: 'https://dehouse.vercel.app',
         changeOrigin: true,
         secure: true
       }
