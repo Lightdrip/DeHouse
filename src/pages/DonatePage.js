@@ -19,7 +19,7 @@ const DonateSection = styled(Section)`
 
 const CryptoCard = styled(Card)`
   margin-bottom: 48px;
-  scroll-margin-top: 100px; /* Space for fixed header */
+  scroll-margin-top: 220px; /* Increased space for fixed header + nav + buffer */
 `;
 
 const CryptoHeader = styled(Flex)`
@@ -95,9 +95,36 @@ const SuccessMessage = styled.div`
 const JumpLinkContainer = styled(Flex)`
   position: sticky;
   top: 80px; /* Below header */
-  z-index: 100;
-  padding: 16px 0;
+  z-index: 99;
+  padding: 16px 24px;
   margin-bottom: 40px;
+  background: rgba(15, 22, 36, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+
+  @media (max-width: 768px) {
+    top: 70px;
+    padding: 12px 16px;
+    overflow-x: auto;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    
+    /* Hide scrollbar for cleaner look */
+    &::-webkit-scrollbar {
+      display: none;
+    }
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    
+    button {
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+  }
 `;
 
 const CryptoDonationCard = ({ 
@@ -390,13 +417,35 @@ const DonatePage = () => {
     const element = document.getElementById(sectionId);
     
     if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // Calculate offset based on screen size
+      // Mobile header is smaller, but we still have sticky nav
+      const isMobile = window.innerWidth <= 768;
+      const headerOffset = isMobile ? 70 : 90;
+      const navOffset = isMobile ? 60 : 80;
+      const buffer = 20; // Extra space ("millimeters")
+      
+      const totalOffset = headerOffset + navOffset + buffer;
+      
+      const elementPosition = element.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - totalOffset;
+
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: 'smooth'
+      });
     } else {
       console.error(`Target section "${sectionId}" not found for scrolling.`);
       // Fallback: scroll to top of donation section
       const mainSection = document.getElementById('donation-section');
       if (mainSection) {
-        mainSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const offset = 150;
+        const elementPosition = mainSection.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - offset;
+        
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: 'smooth'
+        });
       }
     }
   }, []);

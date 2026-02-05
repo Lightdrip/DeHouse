@@ -66,10 +66,17 @@ const LeaderboardHeader = styled(Flex)`
   margin-bottom: 24px;
   padding-bottom: 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
 `;
 
 const LeaderboardTable = styled.div`
   width: 100%;
+  overflow-x: auto;
 `;
 
 const TableHeader = styled(Flex)`
@@ -78,12 +85,14 @@ const TableHeader = styled(Flex)`
   border-radius: 8px;
   margin-bottom: 16px;
   font-weight: 600;
+  min-width: 600px; /* Ensure table doesn't squash too much */
 `;
 
 const TableRow = styled(Flex)`
   padding: 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   transition: all 0.3s ease;
+  min-width: 600px; /* Ensure table doesn't squash too much */
 
   &:hover {
     background-color: rgba(108, 92, 231, 0.05);
@@ -129,9 +138,23 @@ const DonationsCell = styled.div`
 `;
 
 const FilterContainer = styled(Flex)`
-  margin-bottom: 24px;
+  margin-bottom: 0;
   position: relative;
   z-index: 1; /* Lower z-index than header */
+
+  @media (max-width: 480px) {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px !important;
+    
+    button {
+      flex: 1;
+      font-size: 13px;
+      padding: 8px 4px;
+      min-width: 80px;
+      white-space: nowrap;
+    }
+  }
 `;
 
 
@@ -141,6 +164,11 @@ const SearchContainer = styled.div`
   max-width: 400px;
   /* Keep position: relative here as it's needed for the SearchIcon positioning */
   z-index: 1; /* Lower z-index than header */
+  
+  @media (max-width: 768px) {
+    max-width: 100%;
+    margin-bottom: 16px;
+  }
 `;
 
 
